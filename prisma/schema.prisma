@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  role          String   // ADMIN, CASHIER, INVENTORY_MANAGER
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  sales         Sale[]
+  auditLogs     AuditLog[]
+
+  @@index([role, status])
+  @@index([createdAt])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  products    Product[]
+}
+
+model Supplier {
+  id                String    @id @default(cuid())
+  name              String
+  contactPerson     String?
+  phone             String?
+  email             String?
+  address           String?
+  taxNumber         String?
+  paymentTerms      String?
+  leadTimeDays      Int?
+  bankName          String?
+  bankAccountNumber String?
+  notes             String?
+  status            String    @default("ACTIVE")
+  products          Product[]
+  supplyItems       SupplierSupplyItem[]
+  supplyRecords     SupplierSupplyRecord[]
+
+  @@index([name])
+  @@index([status, name])
+}
+
+model SupplierSupplyItem {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime @default(now())
+
+  @@index([supplierId, name])
+}
+
+model SupplierSupplyRecord {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  itemName   String
+  quantity   Float
+  unitPrice  Float    @default(0)
+  notes      String?
+  suppliedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([supplierId, suppliedAt])
+  @@index([itemName])
+}
+
+model Customer {
+  id      String  @id @default(cuid())
+  name    String
+  phone   String? @unique
+  email   String?
+  address String?
+  sales   Sale[]
+
+  @@index([name])
+}
+
+model Product {
+  id                     String   @id @default(cuid())
+  name                   String
+  sku                    String   @unique
+  barcode                String?  @unique
+  categoryId             String?
+  category               Category? @relation(fields: [categoryId], references: [id])
+  supplierId             String?
+  supplier               Supplier? @relation(fields: [supplierId], references: [id])
+  unitType               String   @default("PIECE") // PIECE, SQFT, METER, ROLL, etc.
+  buyingPrice            Float
+  sellingPrice           Float
+  currentStock           Float    @default(0)
+  minimumStockThreshold  Float    @default(5)
+  rollLengthFeet         Float?
+  rollWidthFeet          Float?
+  isService              Boolean  @default(false)
+  materialId             String?
+  material               Product? @relation("MaterialUsage", fields: [materialId], references: [id])
+  usedBy                 Product[] @relation("MaterialUsage")
+  status                 String   @default("ACTIVE")
+  lastRestockDate        DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  saleItems              SaleItem[]
+  inventoryTransactions  InventoryTransaction[]
+  stockAlerts            StockAlert[]
+
+  @@index([categoryId, status])
+  @@index([supplierId])
+  @@index([isService, materialId])
+  @@index([createdAt])
+}
+
+model AppMeta {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model BannerSizePreset {
+  id        String   @id @default(cuid())
+  name      String
+  width     Float
+  height    Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, createdAt])
+}
+
+model Sale {
+  id            String     @id @default(cuid())
+  invoiceNumber String     @unique
+  customerId    String?
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  cashierId     String
+  cashier       User       @relation(fields: [cashierId], references: [id])
+  subtotal      Float
+  discount      Float      @default(0)
+  total         Float
+  paidAmount    Float
+  balance       Float
+  paymentMethod String     @default("CASH")
+  createdAt     DateTime   @default(now())
+  items         SaleItem[]
+
+  @@index([createdAt])
+  @@index([cashierId, createdAt])
+  @@index([customerId, createdAt])
+}
+
+model SaleItem {
+  id           String  @id @default(cuid())
+  saleId       String
+  sale         Sale    @relation(fields: [saleId], references: [id])
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  quantity     Float
+  width        Float?
+  height       Float?
+  designerCost Float?  @default(0)
+  buyingPrice  Float
+  sellingPrice Float
+  discount     Float   @default(0)
+  total        Float
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model InventoryTransaction {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  transactionType String   // STOCK_IN, SALE_OUT, ADJUSTMENT_IN, ADJUSTMENT_OUT, DAMAGED, RETURNED
+  quantity        Float
+  referenceId     String?
+  reason          String?
+  performedBy     String?
+  createdAt       DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([transactionType, createdAt])
+}
+
+model StockAlert {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  currentStock  Float
+  thresholdValue Float
+  status        String    @default("UNREAD") // UNREAD, READ, RESOLVED
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+
+  @@index([productId, status])
+  @@index([createdAt])
+}
+
+model NotificationRecipient {
+  id               String   @id @default(cuid())
+  name             String
+  email            String   @unique
+  isEnabled        Boolean  @default(true)
+  notificationType String   @default("INVENTORY_REDUCTION")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([notificationType, isEnabled])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  module    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([module, createdAt])
+}
