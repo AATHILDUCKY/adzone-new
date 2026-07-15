@@ -20,6 +20,9 @@ import {
   CircleAlert,
   FileText,
   PackagePlus,
+  UserPlus,
+  UserRound,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -311,6 +314,7 @@ export default function POS() {
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [customerLookup, setCustomerLookup] = useState("");
   const [showCustomerRequiredModal, setShowCustomerRequiredModal] = useState(false);
+  const [continueCheckoutAfterCustomer, setContinueCheckoutAfterCustomer] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [newCustomerData, setNewCustomerData] = useState({
     name: "",
@@ -692,6 +696,13 @@ export default function POS() {
       return haystack.includes(keyword);
     });
   }, [customerLookup, customers]);
+  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId) || null;
+
+  const openCustomerPanel = (continueToCheckout = false) => {
+    setContinueCheckoutAfterCustomer(continueToCheckout);
+    setCustomerLookup("");
+    setShowCustomerRequiredModal(true);
+  };
 
   useEffect(() => {
     if (cart.length === 0) {
@@ -720,6 +731,7 @@ export default function POS() {
     }
 
     if (parsedPaidAmount < total && !selectedCustomerId) {
+      setContinueCheckoutAfterCustomer(true);
       setShowCustomerRequiredModal(true);
       return;
     }
@@ -756,7 +768,10 @@ export default function POS() {
         address: "",
       });
       setShowCustomerRequiredModal(false);
-      setIsCheckoutConfirmOpen(true);
+      if (continueCheckoutAfterCustomer) {
+        setIsCheckoutConfirmOpen(true);
+      }
+      setContinueCheckoutAfterCustomer(false);
       toast.success("Customer added");
     } catch (error: any) {
       toast.error(error.message || "Failed to add customer");
@@ -847,18 +862,22 @@ export default function POS() {
             </button>
           </div>
 
-          <select
-            value={selectedCustomerId}
-            onChange={(event) => setSelectedCustomerId(event.target.value)}
-            className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-zinc-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-4 focus:ring-orange-500/10"
+          <button
+            type="button"
+            onClick={() => openCustomerPanel(false)}
+            className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-left text-zinc-900 shadow-sm transition-all hover:border-orange-300 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-500/10"
           >
-            <option value="">Walk-in Customer</option>
-            {customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.name} {customer.phone ? `(${customer.phone})` : ""}
-              </option>
-            ))}
-          </select>
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                <UserRound size={18} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Customer</span>
+                <span className="block truncate text-sm font-semibold">{selectedCustomer?.name || "Walk-in Customer"}</span>
+              </span>
+            </span>
+            <UserPlus size={18} className="shrink-0 text-orange-600" />
+          </button>
         </div>
 
         <div className="scrollbar-hidden xl:flex-1 xl:overflow-y-auto xl:pr-2">
@@ -976,8 +995,40 @@ export default function POS() {
             <ShoppingCart className="mr-2 text-orange-600" size={20} />
             <h3 className="text-lg font-bold text-zinc-900">Current Order</h3>
           </div>
-          <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">{cart.length} Items</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openCustomerPanel(false)}
+              className={cn(
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-all",
+                selectedCustomer
+                  ? "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                  : "border-zinc-200 bg-white text-zinc-500 hover:border-orange-200 hover:text-orange-600",
+              )}
+              aria-label={selectedCustomer ? `Change customer: ${selectedCustomer.name}` : "Add customer details"}
+              title={selectedCustomer ? `Customer: ${selectedCustomer.name}` : "Add customer"}
+            >
+              {selectedCustomer ? <UserRound size={17} /> : <UserPlus size={17} />}
+            </button>
+            <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">{cart.length} Items</span>
+          </div>
         </div>
+
+        {selectedCustomer && (
+          <div className="flex items-center justify-between border-b border-orange-100 bg-orange-50/60 px-5 py-2.5 sm:px-6">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-orange-800">{selectedCustomer.name}</p>
+              <p className="truncate text-[11px] text-orange-700/70">{selectedCustomer.phone || selectedCustomer.email || "Customer attached to order"}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedCustomerId("")}
+              className="ml-3 text-[11px] font-bold text-orange-700 hover:text-orange-900"
+            >
+              Remove
+            </button>
+          </div>
+        )}
 
         <div className="min-h-[420px] flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 pb-5 pt-4 [scrollbar-gutter:stable] sm:px-6 xl:min-h-0">
           {cart.length === 0 ? (
@@ -1819,13 +1870,20 @@ export default function POS() {
 
       {showCustomerRequiredModal && (
         <div className="fixed inset-0 z-[112] flex items-center justify-center bg-zinc-900/55 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl sm:p-8">
-            <h2 className="text-xl font-bold text-zinc-900">Customer Required For Unpaid Order</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Paid amount is lower than the bill. Select an existing customer or add a new customer before continuing.
-            </p>
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl sm:p-8">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-orange-50 p-3 text-orange-700"><UserPlus size={21} /></div>
+              <div>
+                <h2 className="text-xl font-bold text-zinc-900">{continueCheckoutAfterCustomer ? "Customer Required For Unpaid Order" : "Add Customer To Order"}</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {continueCheckoutAfterCustomer
+                    ? "Select an existing customer or quickly create one before saving the pending payment."
+                    : "Search your customer list or create a new profile without leaving the cart."}
+                </p>
+              </div>
+            </div>
 
-            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm">
+            {continueCheckoutAfterCustomer && <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm">
               <div className="flex items-center justify-between text-zinc-600">
                 <span>Total Bill</span>
                 <span className="font-semibold text-zinc-900">LKR {total.toLocaleString()}</span>
@@ -1838,7 +1896,7 @@ export default function POS() {
                 <span>Pending</span>
                 <span className="font-semibold">LKR {pendingAmount.toLocaleString()}</span>
               </div>
-            </div>
+            </div>}
 
             <div className="mt-5">
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">Search Existing Customer</label>
@@ -1849,18 +1907,30 @@ export default function POS() {
                 placeholder="Search by name, phone, or email..."
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-orange-500 focus:bg-white focus:outline-none"
               />
-              <select
-                value={selectedCustomerId}
-                onChange={(event) => setSelectedCustomerId(event.target.value)}
-                className="mt-3 w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm focus:border-orange-500 focus:outline-none"
-              >
-                <option value="">Select customer</option>
-                {filteredCustomers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} {customer.phone ? `(${customer.phone})` : ""}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-3 max-h-48 space-y-2 overflow-y-auto overscroll-contain rounded-2xl border border-zinc-200 bg-zinc-50 p-2 [scrollbar-gutter:stable]">
+                {filteredCustomers.length ? filteredCustomers.slice(0, 20).map((customer) => {
+                  const isSelected = customer.id === selectedCustomerId;
+                  return (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => setSelectedCustomerId(customer.id)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
+                        isSelected ? "border-orange-300 bg-orange-50" : "border-transparent bg-white hover:border-zinc-200",
+                      )}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-zinc-900">{customer.name}</span>
+                        <span className="block truncate text-xs text-zinc-500">{customer.phone || customer.email || "No contact details"}</span>
+                      </span>
+                      {isSelected && <span className="rounded-full bg-orange-600 p-1 text-white"><Check size={12} /></span>}
+                    </button>
+                  );
+                }) : (
+                  <p className="px-3 py-6 text-center text-sm text-zinc-500">No matching customers found.</p>
+                )}
+              </div>
             </div>
 
             <form onSubmit={createCustomerFromCheckout} className="mt-5 grid gap-3 md:grid-cols-2">
@@ -1895,7 +1965,10 @@ export default function POS() {
               <div className="md:col-span-2 flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => setShowCustomerRequiredModal(false)}
+                  onClick={() => {
+                    setShowCustomerRequiredModal(false);
+                    setContinueCheckoutAfterCustomer(false);
+                  }}
                   className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-600 hover:bg-zinc-50"
                 >
                   Cancel
@@ -1908,11 +1981,14 @@ export default function POS() {
                       return;
                     }
                     setShowCustomerRequiredModal(false);
-                    setIsCheckoutConfirmOpen(true);
+                    if (continueCheckoutAfterCustomer) {
+                      setIsCheckoutConfirmOpen(true);
+                    }
+                    setContinueCheckoutAfterCustomer(false);
                   }}
                   className="flex-1 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
                 >
-                  Use Selected Customer
+                  {continueCheckoutAfterCustomer ? "Use & Continue" : "Use Customer"}
                 </button>
                 <button
                   type="submit"

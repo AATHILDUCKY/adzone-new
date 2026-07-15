@@ -211,10 +211,6 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
   const handleNotificationToggle = () => {
     const nextOpenState = !isNotificationOpen;
     setIsNotificationOpen(nextOpenState);
-
-    if (nextOpenState && notificationData.unreadCount > 0) {
-      void markAllNotificationsRead();
-    }
   };
 
   return (
@@ -370,6 +366,9 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
               <>
                 <button
                   onClick={handleNotificationToggle}
+                  type="button"
+                  aria-label={`Notifications${notificationData.unreadCount ? `, ${notificationData.unreadCount} unread` : ""}`}
+                  aria-expanded={isNotificationOpen}
                   className="relative rounded-2xl border border-white/80 bg-white/80 p-2.5 text-zinc-400 shadow-sm transition-all hover:-translate-y-0.5 hover:text-zinc-900"
                 >
                   <Bell size={20} />
@@ -389,7 +388,9 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
                   </div>
                   <button
                     onClick={() => void markAllNotificationsRead()}
-                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-100"
+                    type="button"
+                    disabled={notificationData.unreadCount === 0}
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 disabled:cursor-default disabled:opacity-40"
                   >
                     <CheckCheck size={14} />
                     Mark all read

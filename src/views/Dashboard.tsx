@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { apiFetch, cn } from "../lib/utils";
 import { 
   TrendingUp, 
@@ -13,7 +14,9 @@ import {
   Trash2,
   UserPlus,
   CheckCircle2,
-  XCircle
+  XCircle,
+  PackageSearch,
+  ChevronRight,
 } from "lucide-react";
 import {
   XAxis,
@@ -61,6 +64,7 @@ function formatTrend(value: number) {
 export default function Dashboard() {
   const { user } = useOutletContext<{ user: any }>();
   const isAdmin = user?.role === "ADMIN";
+  const canManageInventory = user?.role === "ADMIN" || user?.role === "INVENTORY_MANAGER";
   const [stats, setStats] = useState<any>(null);
   const [notificationData, setNotificationData] = useState<NotificationResponse | null>(null);
   const [recipientForm, setRecipientForm] = useState({ name: "", email: "" });
@@ -218,9 +222,12 @@ export default function Dashboard() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-500 text-white shadow-md shadow-red-200">
                     <AlertTriangle size={18} />
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-bold text-red-600">
-                    <ArrowDownRight size={12} className="mr-1" />
-                    Critical
+                  <span className={cn(
+                    "inline-flex items-center rounded-full px-2 py-1 text-[11px] font-bold",
+                    stats.lowStockCount > 0 ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700",
+                  )}>
+                    {stats.lowStockCount > 0 ? <AlertTriangle size={12} className="mr-1" /> : <CheckCircle2 size={12} className="mr-1" />}
+                    {stats.lowStockCount > 0 ? "Action needed" : "Stock healthy"}
                   </span>
                 </div>
                 <p className="metric-label mt-4">Low Stock Alerts</p>
@@ -372,6 +379,63 @@ export default function Dashboard() {
               <p className="mt-2 text-sm text-zinc-500">Profit after raw material, wastage, and service cost.</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="panel-section overflow-hidden">
+        <div className="panel-header bg-gradient-to-r from-red-50/70 via-white to-orange-50/50">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+              <PackageSearch size={21} />
+            </div>
+            <div>
+              <p className="eyebrow-label">Inventory Attention</p>
+              <h3 className="mt-1 text-xl font-bold text-zinc-950">Low-stock materials</h3>
+            </div>
+          </div>
+          {canManageInventory && (
+            <Link href="/inventory" className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm transition-all hover:border-orange-200 hover:text-orange-700">
+              Open inventory <ChevronRight size={14} />
+            </Link>
+          )}
+        </div>
+        <div className="panel-body">
+          {stats.lowStockItems?.length ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {stats.lowStockItems.map((item: any) => {
+                const threshold = Number(item.minimumStockThreshold || 0);
+                const stock = Number(item.currentStock || 0);
+                const stockPercent = threshold > 0 ? Math.max(0, Math.min(100, (stock / threshold) * 100)) : 0;
+                return (
+                  <div key={item.id} className="rounded-2xl border border-red-100 bg-gradient-to-br from-white to-red-50/60 p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-zinc-900">{item.name}</p>
+                        <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{item.sku}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold text-red-700">Low</span>
+                    </div>
+                    <div className="mt-4 flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Available</p>
+                        <p className="mt-1 text-lg font-bold text-red-600">{stock.toLocaleString()} <span className="text-xs font-semibold">{item.unitType}</span></p>
+                      </div>
+                      <p className="text-right text-[11px] text-zinc-500">Minimum<br/><span className="font-bold text-zinc-700">{threshold.toLocaleString()}</span></p>
+                    </div>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-red-100">
+                      <div className="h-full rounded-full bg-red-500" style={{ width: `${stockPercent}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-emerald-200 bg-emerald-50/50 px-6 py-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><PackageCheck size={22} /></div>
+              <p className="mt-3 font-bold text-zinc-900">Inventory levels look healthy</p>
+              <p className="mt-1 text-sm text-zinc-500">No active raw materials are at or below their minimum stock level.</p>
+            </div>
+          )}
         </div>
       </div>
 

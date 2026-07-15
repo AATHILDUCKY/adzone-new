@@ -864,7 +864,7 @@ async function listEnabledInventoryNotificationRecipients(client: any = prisma) 
 
 async function syncLowStockAlerts(client: any = prisma) {
   const products: Array<{ id: string; currentStock: number; minimumStockThreshold: number }> = await client.product.findMany({
-    where: { status: "ACTIVE" },
+    where: { status: "ACTIVE", isService: false },
     select: {
       id: true,
       currentStock: true,
@@ -1329,11 +1329,18 @@ export async function createApp() {
             },
           }),
           prisma.product.findMany({
-            where: { status: "ACTIVE" },
-            select: { currentStock: true, minimumStockThreshold: true },
+            where: { status: "ACTIVE", isService: false },
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              unitType: true,
+              currentStock: true,
+              minimumStockThreshold: true,
+            },
           }),
           prisma.product.findMany({
-            where: { status: "ACTIVE" },
+            where: { status: "ACTIVE", isService: false },
             select: { currentStock: true, minimumStockThreshold: true, buyingPrice: true },
           }),
           prisma.sale.findMany({
@@ -1393,6 +1400,14 @@ export async function createApp() {
       const lowStockCount = lowStockCandidates.reduce((count, product) => {
         return count + (product.currentStock <= product.minimumStockThreshold ? 1 : 0);
       }, 0);
+      const lowStockItems = lowStockCandidates
+        .filter((product) => product.currentStock <= product.minimumStockThreshold)
+        .sort((left, right) => {
+          const leftRatio = left.minimumStockThreshold > 0 ? left.currentStock / left.minimumStockThreshold : left.currentStock;
+          const rightRatio = right.minimumStockThreshold > 0 ? right.currentStock / right.minimumStockThreshold : right.currentStock;
+          return leftRatio - rightRatio;
+        })
+        .slice(0, 8);
 
       const inventoryCostValue = Number(
         activeProducts.reduce((sum, product) => sum + product.currentStock * product.buyingPrice, 0).toFixed(2),
@@ -1453,6 +1468,7 @@ export async function createApp() {
         todayWastage: Number((todayWastageAggregate._sum.quantity ?? 0).toFixed(2)),
         todayWastageCost,
         lowStockCount,
+        lowStockItems,
         inventoryCostValue,
         weekRevenue,
         weekProfit,
@@ -1524,7 +1540,7 @@ export async function createApp() {
 
       const alerts = await prisma.stockAlert.findMany({
         where: {
-          ...(status ? { status } : {}),
+          ...(status ? { status } : { status: { in: ["UNREAD", "READ"] } }),
         },
         include: {
           product: {
