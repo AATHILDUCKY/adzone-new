@@ -523,6 +523,19 @@ function metersToFeet(value: number) {
   return Number((value * FEET_PER_METER).toFixed(4));
 }
 
+// METER was the old internal name for the length unit. Length stock has always
+// been entered and calculated as feet, so normalize legacy clients/data here.
+function normalizeUnitType(value: string) {
+  return value === "METER" ? "FEET" : value;
+}
+
+async function ensureLengthUnitsStoredAsFeet() {
+  await prisma.product.updateMany({
+    where: { unitType: "METER" },
+    data: { unitType: "FEET" },
+  });
+}
+
 function resolveBannerRollFeet(rollCount: number | undefined, rollLengthFeet: number | null | undefined, fallbackStock: number) {
   if (rollCount && rollCount > 0 && rollLengthFeet && rollLengthFeet > 0) {
     return Number((rollCount * rollLengthFeet).toFixed(4));
@@ -615,7 +628,7 @@ function sanitizeProductInput(body: Record<string, unknown>) {
   const isService = body.isService == null ? false : asBoolean(body.isService, "Is service");
   // Any sellable service (material-linked or service-only) needs a customer-facing price.
   const requiresSellingPrice = isService;
-  const unitType = asString(body.unitType, { field: "Unit type", min: 2, max: 20 })!;
+  const unitType = normalizeUnitType(asString(body.unitType, { field: "Unit type", min: 2, max: 20 })!);
   const legacyRollLengthMeters = asNumber(body.rollLengthMeters, { field: "Roll length (meters)", min: 0.1, optional: true });
   const parsedRollLengthFeet = asNumber(body.rollLengthFeet, { field: "Roll length (feet)", min: 0.1, optional: true });
   const rollLengthFeet = unitType === "ROLL"
@@ -653,7 +666,7 @@ function sanitizeProductUpdateInput(body: Record<string, unknown>) {
   const isService = body.isService == null ? false : asBoolean(body.isService, "Is service");
   // Any sellable service (material-linked or service-only) needs a customer-facing price.
   const requiresSellingPrice = isService;
-  const unitType = asString(body.unitType, { field: "Unit type", min: 2, max: 20 })!;
+  const unitType = normalizeUnitType(asString(body.unitType, { field: "Unit type", min: 2, max: 20 })!);
   const legacyRollLengthMeters = asNumber(body.rollLengthMeters, { field: "Roll length (meters)", min: 0.1, optional: true });
   const parsedRollLengthFeet = asNumber(body.rollLengthFeet, { field: "Roll length (feet)", min: 0.1, optional: true });
   const rollLengthFeet = unitType === "ROLL"
@@ -1195,6 +1208,7 @@ function sanitizeSaleItems(items: Record<string, unknown>[]) {
 export async function createApp() {
   await prisma.$connect();
   await ensureInventoryMetaSchema();
+  await ensureLengthUnitsStoredAsFeet();
   await ensureBannerRollStockStoredInFeet();
   await ensureAdminUser(prisma);
 

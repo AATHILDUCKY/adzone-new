@@ -304,13 +304,13 @@ function SupplierFormModal({
 
 const SUPPLIER_UNIT_OPTIONS = [
   { value: "UNIT", label: "Units", hint: "Pieces / items", icon: Package },
-  { value: "METER", label: "Feet", hint: "By length", icon: Ruler },
+  { value: "FEET", label: "Feet", hint: "By length", icon: Ruler },
   { value: "SQFT", label: "Sqft", hint: "By area", icon: Square },
 ] as const;
 
 function getUnitMeta(unitType: string) {
   switch (unitType) {
-    case "METER":
+    case "FEET":
       return { per: "per foot", noun: "feet" };
     case "SQFT":
       return { per: "per sqft", noun: "sqft" };

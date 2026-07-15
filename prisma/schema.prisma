@@ -97,7 +97,7 @@ model Product {
   category               Category? @relation(fields: [categoryId], references: [id])
   supplierId             String?
   supplier               Supplier? @relation(fields: [supplierId], references: [id])
-  unitType               String   @default("PIECE") // PIECE, SQFT, METER, ROLL, etc.
+  unitType               String   @default("PIECE") // PIECE, SQFT, FEET, ROLL, etc.
   buyingPrice            Float
   sellingPrice           Float
   currentStock           Float    @default(0)

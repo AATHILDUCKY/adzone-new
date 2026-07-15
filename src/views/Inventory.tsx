@@ -89,9 +89,8 @@ function isPerUnitType(unitType: string) {
   return unitType === "UNIT";
 }
 
-// METER is shown as "feet" throughout the app (the "Per Feet (Length)" unit type).
 function getUnitLabel(unitType: string) {
-  return unitType === "METER" ? "feet" : unitType.toLowerCase();
+  return unitType === "FEET" ? "feet" : unitType.toLowerCase();
 }
 
 function getUnitPriceLabel(unitType: string) {
@@ -416,7 +415,7 @@ export default function Inventory() {
                 <select value={newProduct.unitType} onChange={e => setNewProduct({...newProduct, unitType: e.target.value})} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-orange-500 focus:bg-white focus:outline-none">
                   <option value="UNIT">Per Unit</option>
                   <option value="SQFT">Per Sqft (Area)</option>
-                  <option value="METER">Per Feet (Length)</option>
+                  <option value="FEET">Per Feet (Length)</option>
                 </select>
               </div>
               {isNewProductPerUnit && (
@@ -481,7 +480,7 @@ export default function Inventory() {
                 <select value={editProduct.unitType} onChange={e => setEditProduct({...editProduct, unitType: e.target.value})} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-orange-500 focus:bg-white focus:outline-none">
                   <option value="UNIT">Per Unit</option>
                   <option value="SQFT">Per Sqft (Area)</option>
-                  <option value="METER">Per Feet (Length)</option>
+                  <option value="FEET">Per Feet (Length)</option>
                   {/* Legacy: only selectable for materials already saved as Per Roll. New materials use Per Feet instead. */}
                   {editProduct.unitType === "ROLL" && <option value="ROLL">Per Roll (legacy)</option>}
                 </select>

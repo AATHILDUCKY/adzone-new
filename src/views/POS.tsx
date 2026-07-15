@@ -143,7 +143,7 @@ function createInitialProductForm(product?: Product | null): ProductCreateState 
 }
 
 function isConfigurableProduct(product: Product) {
-  return product.isService || ["SQFT", "METER", "ROLL"].includes(product.unitType);
+  return product.isService || ["SQFT", "FEET", "ROLL"].includes(product.unitType);
 }
 
 // Categories were removed; any ROLL material is treated as feet-based (banner-style).
@@ -168,7 +168,7 @@ function getLengthUnitLabel(product: Product) {
     return "feet";
   }
 
-  return product.unitType === "METER" ? "feet" : product.unitType.toLowerCase();
+  return product.unitType === "FEET" ? "feet" : product.unitType.toLowerCase();
 }
 
 function getLengthUnitPriceLabel(product: Product) {
@@ -176,7 +176,7 @@ function getLengthUnitPriceLabel(product: Product) {
     return "foot";
   }
 
-  return product.unitType === "METER" ? "foot" : product.unitType.toLowerCase();
+  return product.unitType === "FEET" ? "foot" : product.unitType.toLowerCase();
 }
 
 function getAvailableLengthFromRolls(product: Product) {
@@ -228,7 +228,7 @@ function getBilledQuantity(product: Product, config: ConfigState) {
     return config.width * config.height;
   }
 
-  if (product.unitType === "METER" || isBannerRollProduct(product)) {
+  if (product.unitType === "FEET" || isBannerRollProduct(product)) {
     return config.length;
   }
 
@@ -609,7 +609,7 @@ export default function POS() {
     const configSummary =
       activeConfigItem.unitType === "SQFT"
         ? `${configData.width}ft x ${configData.height}ft (${formatQuantity(billedQuantity)} sqft)`
-        : activeConfigItem.unitType === "METER" || isBannerRollProduct(activeConfigItem)
+        : activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
           ? `${formatQuantity(configData.length)} ${getLengthUnitLabel(activeConfigItem)}`
           : `${formatQuantity(configData.quantity)} ${activeConfigItem.unitType.toLowerCase()}`;
 
@@ -1337,7 +1337,7 @@ export default function POS() {
                   </>
                 )}
 
-                {(activeConfigItem.unitType === "METER" || isBannerRollProduct(activeConfigItem)) && (
+                {(activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)) && (
                   <div>
                     <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">
                       Length ({isLengthInFeet(activeConfigItem) ? "ft" : "feet"})
@@ -1356,7 +1356,7 @@ export default function POS() {
                   </div>
                 )}
 
-                {activeConfigItem.unitType !== "SQFT" && activeConfigItem.unitType !== "METER" && !isBannerRollProduct(activeConfigItem) && (
+                {activeConfigItem.unitType !== "SQFT" && activeConfigItem.unitType !== "FEET" && !isBannerRollProduct(activeConfigItem) && (
                   <div>
                     <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">Quantity</label>
                     <input
@@ -1406,7 +1406,7 @@ export default function POS() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    Wastage ({activeConfigItem.unitType === "METER" || isBannerRollProduct(activeConfigItem)
+                    Wastage ({activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
                       ? (isLengthInFeet(activeConfigItem) ? "ft" : "feet")
                       : activeConfigItem.unitType})
                   </label>
@@ -1436,7 +1436,7 @@ export default function POS() {
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-500">Billed quantity</span>
                     <span className="font-bold">
-                      {formatQuantity(previewQuantity)} {activeConfigItem.unitType === "METER" || isBannerRollProduct(activeConfigItem)
+                      {formatQuantity(previewQuantity)} {activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
                         ? getLengthUnitCode(activeConfigItem)
                         : activeConfigItem.unitType}
                     </span>
@@ -1456,7 +1456,7 @@ export default function POS() {
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-500">Wastage</span>
                     <span className="font-bold">
-                      {formatQuantity(configData.wastage)} {activeConfigItem.unitType === "METER" || isBannerRollProduct(activeConfigItem)
+                      {formatQuantity(configData.wastage)} {activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
                         ? getLengthUnitCode(activeConfigItem)
                         : activeConfigItem.unitType}
                     </span>
@@ -1656,7 +1656,7 @@ export default function POS() {
                   >
                     <option value="UNIT">Per Unit</option>
                     <option value="SQFT">Per Sqft</option>
-                    <option value="METER">Per Feet</option>
+                    <option value="FEET">Per Feet</option>
                   </select>
                 </div>
               )}
