@@ -823,15 +823,16 @@ export default function POS() {
     }
   };
 
-  const printCompletedInvoice = () => {
+  const printCompletedInvoice = async () => {
     if (!printPromptOrder) {
       return;
     }
 
     try {
-      printOrderInvoice(printPromptOrder, shopProfile);
+      await printOrderInvoice(printPromptOrder, shopProfile);
+      if (shopProfile.printerName) toast.success(`Invoice sent to ${shopProfile.printerName}`);
     } catch (error: any) {
-      toast.error(error.message || "Failed to open print window");
+      toast.error(error.message || "Failed to print invoice");
     } finally {
       setPrintPromptOrder(null);
     }
@@ -2014,7 +2015,7 @@ export default function POS() {
                 <h2 className="text-xl font-bold text-zinc-900">
                   {printPromptOrder.total > printPromptOrder.paidAmount ? "Pending Order Saved" : "Sale Completed"}
                 </h2>
-                <p className="mt-1 text-sm text-zinc-500">Do you want to print the A4 invoice now?</p>
+                <p className="mt-1 text-sm text-zinc-500">Do you want to print the B5 invoice now?</p>
               </div>
             </div>
 
@@ -2061,7 +2062,7 @@ export default function POS() {
 
             <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <CircleAlert size={14} className="mt-0.5 shrink-0" />
-              Printing uses your browser's print dialog. Choose A4 paper (and "Save as PDF" to keep a copy).
+              A saved printer prints directly on B5 paper. Without one, your browser print dialog will open.
             </div>
           </div>
         </div>

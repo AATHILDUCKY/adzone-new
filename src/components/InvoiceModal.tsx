@@ -18,7 +18,7 @@ export default function InvoiceModal({ order, onClose, onPrint }: InvoiceModalPr
       <div className="relative flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 sm:px-8">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-400">A4 Invoice Preview</p>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-400">B5 Invoice Preview</p>
             <h2 className="mt-1 text-xl font-bold text-zinc-900">{order.invoiceNumber}</h2>
           </div>
           <div className="flex items-center gap-3">
@@ -27,7 +27,7 @@ export default function InvoiceModal({ order, onClose, onPrint }: InvoiceModalPr
               className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-zinc-800"
             >
               <Printer size={16} />
-              Print / Save PDF
+              Print Invoice
             </button>
             <button onClick={onClose} className="rounded-xl border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900">
               <X size={18} />

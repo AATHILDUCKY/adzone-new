@@ -301,7 +301,8 @@ export default function Orders() {
       const order = await apiFetch(`/orders/${orderId}`);
       setSelectedOrder(order);
       if (autoPrint) {
-        printOrderInvoice(order, shopProfile);
+        await printOrderInvoice(order, shopProfile);
+        if (shopProfile.printerName) toast.success(`Invoice sent to ${shopProfile.printerName}`);
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to load invoice");
@@ -310,15 +311,16 @@ export default function Orders() {
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!selectedOrder) {
       return;
     }
 
     try {
-      printOrderInvoice(selectedOrder, shopProfile);
+      await printOrderInvoice(selectedOrder, shopProfile);
+      if (shopProfile.printerName) toast.success(`Invoice sent to ${shopProfile.printerName}`);
     } catch (error: any) {
-      toast.error(error.message || "Failed to open print window");
+      toast.error(error.message || "Failed to print invoice");
     }
   };
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
-import { ShieldAlert, Store, Upload, Trash2, Save, FileText } from "lucide-react";
+import { ShieldAlert, Store, Upload, Trash2, Save, FileText, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useShopProfile } from "../components/ShopProfileProvider";
 import { useOutletContext } from "../components/OutletContext";
@@ -26,10 +26,28 @@ export default function Settings() {
   const { shopProfile, setShopProfile } = useShopProfile();
   const [formData, setFormData] = useState<ShopProfile>(shopProfile);
   const [saving, setSaving] = useState(false);
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
+
+  const loadPrinters = async () => {
+    setLoadingPrinters(true);
+    try {
+      const data = await apiFetch("/printers");
+      setPrinters(Array.isArray(data.printers) ? data.printers : []);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load printers");
+    } finally {
+      setLoadingPrinters(false);
+    }
+  };
 
   useEffect(() => {
     setFormData(shopProfile);
   }, [shopProfile]);
+
+  useEffect(() => {
+    void loadPrinters();
+  }, []);
 
   if (user.role !== "ADMIN") {
     return (
@@ -186,6 +204,37 @@ export default function Settings() {
                 className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/5"
                 placeholder="Thank-you note, refund note, or payment reminder"
               />
+            </div>
+
+            <div className="space-y-3 md:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-zinc-700">
+                  <Printer size={16} /> Invoice Printer
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void loadPrinters()}
+                  disabled={loadingPrinters}
+                  className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900 disabled:opacity-50"
+                >
+                  <RefreshCw size={14} className={loadingPrinters ? "animate-spin" : ""} />
+                  Refresh printers
+                </button>
+              </div>
+              <select
+                value={formData.printerName || ""}
+                onChange={(event) => handleChange("printerName", event.target.value)}
+                className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/5"
+              >
+                <option value="">Use browser print dialog</option>
+                {formData.printerName && !printers.includes(formData.printerName) ? (
+                  <option value={formData.printerName}>{formData.printerName} (currently unavailable)</option>
+                ) : null}
+                {printers.map((printer) => <option key={printer} value={printer}>{printer}</option>)}
+              </select>
+              <p className="text-xs text-zinc-500">
+                Saved invoices print directly on ISO B5 paper. Printers are provided by this computer's print system.
+              </p>
             </div>
 
             <div className="space-y-3 md:col-span-2">

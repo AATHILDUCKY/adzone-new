@@ -1,5 +1,10 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
+import { execFile } from "child_process";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { promisify } from "util";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { authenticate, createAuthToken, requireRoles, type AuthenticatedRequest } from "./auth";
@@ -162,6 +167,7 @@ type SupplierSupplyItemRow = {
 type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
 const FEET_PER_METER = 3.28084;
+const execFileAsync = promisify(execFile);
 const SHOP_PROFILE_META_KEYS = {
   shopName: "shop-profile.shop-name",
   tagline: "shop-profile.tagline",
@@ -170,6 +176,7 @@ const SHOP_PROFILE_META_KEYS = {
   address: "shop-profile.address",
   invoiceFooter: "shop-profile.invoice-footer",
   logoUrl: "shop-profile.logo-url",
+  printerName: "shop-profile.printer-name",
 } as const;
 
 type ShopProfile = {
@@ -180,6 +187,7 @@ type ShopProfile = {
   address?: string;
   invoiceFooter?: string;
   logoUrl?: string;
+  printerName?: string;
 };
 
 const defaultShopProfile: ShopProfile = {
@@ -477,6 +485,7 @@ function sanitizeShopProfileInput(body: any): ShopProfile {
     address: asString(body?.address, { field: "Address", max: 240, optional: true }),
     invoiceFooter: asString(body?.invoiceFooter, { field: "Invoice footer", max: 240, optional: true }),
     logoUrl: validateShopLogoUrl(body?.logoUrl),
+    printerName: asString(body?.printerName, { field: "Printer", max: 180, optional: true }),
   };
 }
 
@@ -499,7 +508,49 @@ async function getShopProfile(client: typeof prisma = prisma): Promise<ShopProfi
     address: byKey.get(SHOP_PROFILE_META_KEYS.address) || defaultShopProfile.address,
     invoiceFooter: byKey.get(SHOP_PROFILE_META_KEYS.invoiceFooter) || defaultShopProfile.invoiceFooter,
     logoUrl: byKey.get(SHOP_PROFILE_META_KEYS.logoUrl) || undefined,
+    printerName: byKey.get(SHOP_PROFILE_META_KEYS.printerName) || undefined,
   };
+}
+
+async function getSystemPrinters() {
+  try {
+    const { stdout } = await execFileAsync("lpstat", ["-p"], { timeout: 5_000 });
+    return stdout
+      .split(/\r?\n/)
+      .map((line) => line.match(/^printer\s+(\S+)/)?.[1])
+      .filter((name): name is string => Boolean(name));
+  } catch (error: any) {
+    if (
+      error?.code === 1 &&
+      (!String(error?.stdout || "").trim() || String(error?.stderr || "").includes("Scheduler is not running"))
+    ) return [];
+    throw new ApiError(503, "Could not read printers from the operating system");
+  }
+}
+
+async function printB5Invoice(printerName: string, markup: string) {
+  const printers = await getSystemPrinters();
+  if (!printers.includes(printerName)) throw new ApiError(400, "The saved printer is not available");
+
+  const workingDirectory = await mkdtemp(join(tmpdir(), "adzone-invoice-"));
+  const htmlPath = join(workingDirectory, "invoice.html");
+  const pdfPath = join(workingDirectory, "invoice.pdf");
+
+  try {
+    await writeFile(htmlPath, markup, "utf8");
+    await execFileAsync("google-chrome", [
+      "--headless",
+      "--no-sandbox",
+      "--disable-gpu",
+      `--print-to-pdf=${pdfPath}`,
+      `file://${htmlPath}`,
+    ], { timeout: 30_000 });
+    await execFileAsync("lp", ["-d", printerName, "-o", "media=iso_b5_176x250mm", pdfPath], { timeout: 15_000 });
+  } catch {
+    throw new ApiError(503, "The invoice could not be sent to the printer");
+  } finally {
+    await rm(workingDirectory, { recursive: true, force: true });
+  }
 }
 
 async function saveShopProfile(profile: ShopProfile, client: typeof prisma = prisma) {
@@ -1530,6 +1581,10 @@ export async function createApp() {
       const authUser = (req as AuthenticatedRequest).user;
       const profile = sanitizeShopProfileInput(req.body);
 
+      if (profile.printerName && !(await getSystemPrinters()).includes(profile.printerName)) {
+        throw new ApiError(400, "Select a printer that is currently available");
+      }
+
       await saveShopProfile(profile);
       await prisma.auditLog.create({
         data: {
@@ -1541,6 +1596,29 @@ export async function createApp() {
       });
 
       res.json(await getShopProfile());
+    }),
+  );
+
+  app.get(
+    "/api/printers",
+    authenticate,
+    requireRoles("ADMIN"),
+    asyncHandler(async (_req, res) => {
+      res.json({ printers: await getSystemPrinters() });
+    }),
+  );
+
+  app.post(
+    "/api/print/invoice",
+    authenticate,
+    requireRoles("ADMIN", "CASHIER"),
+    asyncHandler(async (req, res) => {
+      const profile = await getShopProfile();
+      if (!profile.printerName) throw new ApiError(409, "No printer is saved in Settings");
+
+      const markup = asString(req.body?.markup, { field: "Invoice", min: 20, max: 900_000 })!;
+      await printB5Invoice(profile.printerName, markup);
+      res.json({ printed: true, printerName: profile.printerName });
     }),
   );
 

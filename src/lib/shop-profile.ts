@@ -6,6 +6,7 @@ export type ShopProfile = {
   address?: string;
   invoiceFooter?: string;
   logoUrl?: string;
+  printerName?: string;
 };
 
 export const defaultShopProfile: ShopProfile = {
@@ -28,5 +29,6 @@ export function normalizeShopProfile(value: unknown): ShopProfile {
     address: profile.address?.trim() || defaultShopProfile.address,
     invoiceFooter: profile.invoiceFooter?.trim() || defaultShopProfile.invoiceFooter,
     logoUrl: profile.logoUrl?.trim() || undefined,
+    printerName: profile.printerName?.trim() || undefined,
   };
 }

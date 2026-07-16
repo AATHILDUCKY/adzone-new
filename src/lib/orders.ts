@@ -1,4 +1,5 @@
 import { defaultShopProfile, type ShopProfile } from "./shop-profile";
+import { apiFetch } from "./utils";
 
 export type OrderListEntry = {
   id: string;
@@ -213,7 +214,7 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
         <style>
           :root { color-scheme: light; }
           * { box-sizing: border-box; }
-          @page { size: A4; margin: 0; }
+          @page { size: B5 portrait; margin: 0; }
           body {
             margin: 0;
             padding: 0 12px 16px;
@@ -226,8 +227,8 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
             print-color-adjust: exact;
           }
           .sheet {
-            width: 210mm;
-            min-height: 297mm;
+            width: 176mm;
+            min-height: 250mm;
             margin: 0 auto;
             background: #fff;
             box-shadow: 0 10px 40px rgba(0,0,0,.18);
@@ -339,7 +340,7 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
           }
           @media print {
             body { background: #fff; padding: 0; }
-            .sheet { width: 210mm; min-height: 297mm; margin: 0; box-shadow: none; }
+            .sheet { width: 176mm; min-height: 250mm; margin: 0; box-shadow: none; }
             .band-top, .pad { padding-left: 14mm; padding-right: 14mm; }
             .band-bottom { padding-left: 12mm; padding-right: 12mm; }
           }
@@ -416,7 +417,15 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
   `;
 }
 
-export function printOrderInvoice(order: OrderInvoice, shopProfile: ShopProfile) {
+export async function printOrderInvoice(order: OrderInvoice, shopProfile: ShopProfile) {
+  if (shopProfile.printerName) {
+    await apiFetch("/print/invoice", {
+      method: "POST",
+      body: JSON.stringify({ markup: buildInvoiceMarkup(order, shopProfile) }),
+    });
+    return;
+  }
+
   const printWindow = window.open("", "_blank", "width=900,height=1040");
   if (!printWindow) {
     throw new Error("Allow popups to print the invoice");

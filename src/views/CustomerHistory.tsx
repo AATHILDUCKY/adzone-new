@@ -105,15 +105,16 @@ export default function CustomerHistory() {
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!selectedOrder) {
       return;
     }
 
     try {
-      printOrderInvoice(selectedOrder, shopProfile);
+      await printOrderInvoice(selectedOrder, shopProfile);
+      if (shopProfile.printerName) toast.success(`Invoice sent to ${shopProfile.printerName}`);
     } catch (error: any) {
-      toast.error(error.message || "Failed to open print window");
+      toast.error(error.message || "Failed to print invoice");
     }
   };
 
