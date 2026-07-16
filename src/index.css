@@ -25,6 +25,7 @@
 
   html {
     @apply scroll-smooth;
+    overscroll-behavior: none;
   }
 
   body {
@@ -57,6 +58,15 @@
 
   button {
     @apply transition-all duration-200;
+    touch-action: manipulation;
+  }
+
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 
   input:focus,

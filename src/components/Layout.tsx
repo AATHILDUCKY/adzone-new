@@ -19,6 +19,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { apiFetch, cn } from "../lib/utils";
 import { useShopProfile } from "./ShopProfileProvider";
 import { OutletContextProvider } from "./OutletContext";
@@ -37,6 +38,8 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(true);
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [printerLoading, setPrinterLoading] = useState(false);
   const [notificationData, setNotificationData] = useState<{
     unreadCount: number;
     items: Array<{
@@ -53,7 +56,33 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
     }>;
   }>({ unreadCount: 0, items: [] });
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
-  const { shopProfile } = useShopProfile();
+  const { shopProfile, setShopProfile } = useShopProfile();
+
+  const loadPrinters = useCallback(async () => {
+    if (!canAccessPos) return;
+    try {
+      const response = await apiFetch("/printers");
+      setPrinters(Array.isArray(response.printers) ? response.printers : []);
+    } catch {
+      setPrinters([]);
+    }
+  }, [canAccessPos]);
+
+  const handlePrinterChange = async (printerName: string) => {
+    setPrinterLoading(true);
+    try {
+      const updatedProfile = await apiFetch("/printer-selection", {
+        method: "PATCH",
+        body: JSON.stringify({ printerName }),
+      });
+      setShopProfile(updatedProfile);
+      toast.success(printerName ? `Printer changed to ${printerName}` : "Browser printing selected");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to change printer");
+    } finally {
+      setPrinterLoading(false);
+    }
+  };
 
   const loadNotifications = useCallback(async () => {
     const response = await apiFetch("/notifications?status=ALL&limit=15");
@@ -91,6 +120,10 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
     onLogout();
     router.push("/login");
   };
+
+  useEffect(() => {
+    void loadPrinters();
+  }, [loadPrinters]);
 
   useEffect(() => {
     if (isAuditor) {
@@ -358,6 +391,25 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
           </div>
           
           <div ref={notificationMenuRef} className="relative ml-auto flex items-center gap-3">
+            {canAccessPos ? (
+              <label className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/80 bg-white/80 px-2.5 py-2 shadow-sm">
+                <Printer size={17} className="shrink-0 text-orange-600" />
+                <span className="sr-only">Invoice printer</span>
+                <select
+                  aria-label="Invoice printer"
+                  value={shopProfile.printerName || ""}
+                  disabled={printerLoading}
+                  onChange={(event) => void handlePrinterChange(event.target.value)}
+                  className="w-[112px] min-w-0 bg-transparent text-xs font-semibold text-zinc-700 outline-none sm:w-[160px] lg:w-[190px]"
+                >
+                  <option value="">Browser print</option>
+                  {shopProfile.printerName && !printers.includes(shopProfile.printerName) ? (
+                    <option value={shopProfile.printerName}>{shopProfile.printerName} (offline)</option>
+                  ) : null}
+                  {printers.map((printer) => <option key={printer} value={printer}>{printer}</option>)}
+                </select>
+              </label>
+            ) : null}
             <div className="hidden rounded-2xl border border-white/80 bg-white/80 px-4 py-2 shadow-sm lg:block">
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">Signed in as</p>
               <p className="text-sm font-semibold text-zinc-900">{user.name}</p>
@@ -439,7 +491,10 @@ export default function Layout({ user, onLogout, children }: { user: any; onLogo
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 pb-24 pt-5 sm:px-6 sm:pb-28 sm:pt-6 lg:px-8 lg:pb-10 lg:pt-8 xl:px-10">
+        <main className={cn(
+          "flex-1 overflow-y-auto px-4 pb-24 pt-5 sm:px-6 sm:pb-28 sm:pt-6 lg:px-8 lg:pb-10 lg:pt-8 xl:px-10",
+          isAuditor && "px-3 pt-4 sm:px-5 sm:pt-5",
+        )}>
           <div className="mx-auto w-full max-w-[1600px] min-h-full">
             <OutletContextProvider value={{ user }}>
               {children}

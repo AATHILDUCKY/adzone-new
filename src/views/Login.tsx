@@ -4,7 +4,7 @@ import { ArrowRight, Eye, EyeOff, LogIn, Printer, ShieldCheck, Sparkles } from "
 import { useShopProfile } from "../components/ShopProfileProvider";
 
 export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
-  const [email, setEmail] = useState("aathilducky@gmail.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -105,7 +105,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="input-base"
-                  placeholder="aathilducky@gmail.com"
+                  placeholder="Enter your email"
                 />
               </div>
               <div>

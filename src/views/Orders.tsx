@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "../components/OutletContext";
 import {
   CalendarDays,
+  CircleDollarSign,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -540,7 +541,7 @@ export default function Orders() {
             )}
           </div>
 
-          <div className="relative mt-5 grid gap-4">
+          <div className="relative mt-4 grid gap-2 sm:mt-5 sm:gap-4">
             {refreshing && (
               <div className="absolute inset-x-0 top-0 z-10 rounded-2xl bg-white/90 px-4 py-3 text-sm text-zinc-500 shadow-sm backdrop-blur-sm">
                 Refreshing orders...
@@ -548,7 +549,61 @@ export default function Orders() {
             )}
 
             {orders.map((order: OrderListEntry) => (
-              <div key={order.id} className="rounded-[28px] border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+              <div key={order.id}>
+                <div className="flex min-h-16 items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-sm lg:hidden">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                    <ReceiptText size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <p className="truncate text-sm font-bold text-zinc-900">{order.invoiceNumber}</p>
+                      <span className={cn(
+                        "shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase",
+                        order.balance < 0 ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600",
+                      )}>
+                        {order.balance < 0 ? "Due" : "Paid"}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">{formatCurrency(order.total)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={`View invoice ${order.invoiceNumber}`}
+                    title="View invoice"
+                    onClick={() => openInvoice(order.id)}
+                    disabled={loadingInvoiceId === order.id}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white disabled:cursor-wait disabled:opacity-50"
+                  >
+                    <Eye size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Print invoice ${order.invoiceNumber}`}
+                    title="Print invoice"
+                    onClick={() => openInvoice(order.id, true)}
+                    disabled={loadingInvoiceId === order.id}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-700 disabled:cursor-wait disabled:opacity-50"
+                  >
+                    <Printer size={17} />
+                  </button>
+                  {order.balance < 0 && canManagePayments ? (
+                    <button
+                      type="button"
+                      aria-label={`Add payment to ${order.invoiceNumber}`}
+                      title="Add payment"
+                      onClick={() => {
+                        setPaymentUpdateOrder(order);
+                        setPaymentUpdateAmount(Math.abs(order.balance).toFixed(2));
+                        setPaymentUpdateMethod(order.paymentMethod || "CASH");
+                      }}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"
+                    >
+                      <CircleDollarSign size={17} />
+                    </button>
+                  ) : null}
+                </div>
+
+              <div className="hidden rounded-[28px] border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md lg:block">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-start gap-4">
                     <div className="rounded-2xl bg-orange-50 p-3 text-orange-600">
@@ -631,6 +686,7 @@ export default function Orders() {
                     </button>
                   ) : null}
                 </div>
+              </div>
               </div>
             ))}
 

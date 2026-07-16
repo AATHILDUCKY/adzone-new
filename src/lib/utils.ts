@@ -24,6 +24,26 @@ function normalizeEndpoint(endpoint: string) {
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
+// Older versions stored the feet-based length unit under the misleading METER
+// code. Normalize all API responses at one boundary so every screen, label and
+// calculation consistently receives FEET, including data from an older server.
+function normalizeLegacyUnits(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(normalizeLegacyUnits);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        key === "unitType" && nestedValue === "METER" ? "FEET" : normalizeLegacyUnits(nestedValue),
+      ]),
+    );
+  }
+
+  return value;
+}
+
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem("adzone_token");
   const headers = {
@@ -61,5 +81,5 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
       : "The server returned an unexpected response.");
   }
 
-  return response.json();
+  return normalizeLegacyUnits(await response.json());
 }

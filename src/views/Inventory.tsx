@@ -90,7 +90,7 @@ function isPerUnitType(unitType: string) {
 }
 
 function getUnitLabel(unitType: string) {
-  return unitType === "FEET" ? "feet" : unitType.toLowerCase();
+  return unitType === "FEET" || unitType === "METER" ? "feet" : unitType.toLowerCase();
 }
 
 function getUnitPriceLabel(unitType: string) {
@@ -110,7 +110,7 @@ function getRestockSuccessMessage(product: any, quantity: number, rollCount: num
     return `Added ${formatQuantity(quantity)} units to ${product.name}`;
   }
 
-  return `Added ${formatQuantity(quantity)} ${product?.unitType?.toLowerCase() || "items"} to ${product?.name || "product"}`;
+  return `Added ${formatQuantity(quantity)} ${getUnitLabel(product?.unitType || "items")} to ${product?.name || "product"}`;
 }
 
 export default function Inventory() {
@@ -189,7 +189,7 @@ export default function Inventory() {
         return `${formatQuantity(feet)} feet${rollCount != null ? ` (${formatQuantity(rollCount)} rolls)` : ""}`;
       }
     }
-    return `${formatQuantity(product.currentStock)} ${product.unitType}`;
+    return `${formatQuantity(product.currentStock)} ${getUnitLabel(product.unitType)}`;
   };
 
   const isNewProductPerUnit = isPerUnitType(newProduct.unitType);
@@ -273,7 +273,7 @@ export default function Inventory() {
         }),
       });
       const verb = adjustData.direction === "IN" ? "Added" : "Removed";
-      toast.success(`${verb} ${formatQuantity(adjustData.quantity)} ${showAdjust.unitType.toLowerCase()} — ${showAdjust.name}`);
+      toast.success(`${verb} ${formatQuantity(adjustData.quantity)} ${getUnitLabel(showAdjust.unitType)} — ${showAdjust.name}`);
       setShowAdjust(null);
       await loadInventoryData();
     } catch (err: any) {
@@ -736,7 +736,7 @@ export default function Inventory() {
                   </>
                 ) : (
                   <p className={cn("mt-1 font-bold", product.currentStock <= product.minimumStockThreshold ? "text-red-600" : "text-zinc-900")}>
-                    {formatQuantity(product.currentStock)} {product.unitType}
+                    {formatQuantity(product.currentStock)} {getUnitLabel(product.unitType).toUpperCase()}
                   </p>
                 )}
               </div>
@@ -843,7 +843,7 @@ export default function Inventory() {
                     )}>
                       {bannerFeet != null
                         ? `${formatQuantity(bannerFeet)} FEET`
-                        : `${formatQuantity(product.currentStock)} ${product.unitType}`}
+                        : `${formatQuantity(product.currentStock)} ${getUnitLabel(product.unitType).toUpperCase()}`}
                     </span>
                     {product.currentStock <= product.minimumStockThreshold && (
                       <AlertCircle size={14} className="ml-2 text-red-500" />

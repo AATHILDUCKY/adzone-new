@@ -1242,15 +1242,51 @@ export default function Reports() {
           </div>
         </div>
 
-        <div className="rounded-[30px] border border-zinc-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:rounded-[30px] sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-zinc-900">Material Usage & Wastage</h3>
-              <p className="mt-1 text-sm text-zinc-500">Filtered usage records with wastage visibility and reasons.</p>
+              <h3 className="text-base font-bold text-zinc-900 sm:text-lg">Material Usage &amp; Wastage</h3>
+              <p className="mt-1 text-xs text-zinc-500 sm:text-sm">Filtered usage records with wastage visibility and reasons.</p>
             </div>
           </div>
 
-          <div className="mt-6 overflow-x-auto">
+          {/* Mobile: stacked cards (no horizontal scroll) */}
+          <div className="mt-4 space-y-2.5 md:hidden">
+            {filteredUsage.slice(0, 10).map((usage) => {
+              const isWastage = usage.transactionType === "WASTAGE";
+              return (
+                <div key={usage.id} className={cn("rounded-2xl border p-3.5", isWastage ? "border-red-100 bg-red-50/40" : "border-zinc-200 bg-white")}>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 text-sm font-bold text-zinc-900">{usage.product?.name || "Unknown Product"}</p>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider",
+                        isWastage ? "bg-red-100 text-red-600" : "bg-zinc-100 text-zinc-600",
+                      )}
+                    >
+                      {usage.transactionType}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className={cn("text-lg font-bold", isWastage ? "text-red-600" : "text-zinc-900")}>
+                      {formatCompactNumber(usage.quantity)}
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{usage.product?.unitType}</span>
+                  </div>
+                  {usage.reason ? <p className="mt-2 text-xs text-zinc-500">{usage.reason}</p> : null}
+                  <p className="mt-2 text-[11px] text-zinc-400">{new Date(usage.createdAt).toLocaleString()}</p>
+                </div>
+              );
+            })}
+            {!filteredUsage.length && (
+              <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center text-sm text-zinc-500">
+                No usage records match the current filters.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: full table */}
+          <div className="mt-6 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[640px] text-left">
               <thead>
                 <tr className="border-b border-zinc-100">

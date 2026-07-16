@@ -827,7 +827,10 @@ function sanitizeSupplierSupplyItemInput(body: Record<string, unknown>) {
     name: asString(body.name, { field: "Item name", min: 1, max: 120 })!,
     productId: asString(body.productId, { field: "Inventory item", optional: true }),
     categoryId: asString(body.categoryId, { field: "Category", optional: true }),
-    unitType: asString(body.unitType, { field: "Unit type", min: 2, max: 20, optional: true }),
+    unitType: (() => {
+      const value = asString(body.unitType, { field: "Unit type", min: 2, max: 20, optional: true });
+      return value ? normalizeUnitType(value) : undefined;
+    })(),
     buyingPrice: asNumber(body.buyingPrice, { field: "Buying price", min: 0, optional: true }),
     minimumStockThreshold: asNumber(body.minimumStockThreshold, { field: "Minimum stock threshold", min: 0, optional: true }) ?? 0,
     rollLengthFeet: asNumber(body.rollLengthFeet, { field: "Roll length (feet)", min: 0.1, optional: true }),
@@ -1602,9 +1605,39 @@ export async function createApp() {
   app.get(
     "/api/printers",
     authenticate,
-    requireRoles("ADMIN"),
+    requireRoles("ADMIN", "CASHIER"),
     asyncHandler(async (_req, res) => {
       res.json({ printers: await getSystemPrinters() });
+    }),
+  );
+
+  app.patch(
+    "/api/printer-selection",
+    authenticate,
+    requireRoles("ADMIN", "CASHIER"),
+    asyncHandler(async (req, res) => {
+      const authUser = (req as AuthenticatedRequest).user;
+      const printerName = asString(req.body?.printerName, { field: "Printer", max: 180, optional: true });
+
+      if (printerName && !(await getSystemPrinters()).includes(printerName)) {
+        throw new ApiError(400, "Select a printer that is currently available");
+      }
+
+      await prisma.appMeta.upsert({
+        where: { key: SHOP_PROFILE_META_KEYS.printerName },
+        update: { value: printerName || "" },
+        create: { key: SHOP_PROFILE_META_KEYS.printerName, value: printerName || "" },
+      });
+      await prisma.auditLog.create({
+        data: {
+          userId: authUser.id,
+          module: "settings",
+          action: "UPDATE_PRINTER",
+          details: printerName ? `Selected invoice printer ${printerName}` : "Cleared invoice printer selection",
+        },
+      });
+
+      res.json(await getShopProfile());
     }),
   );
 
@@ -2002,6 +2035,53 @@ export async function createApp() {
           totalItems,
           totalPages,
         },
+      });
+    }),
+  );
+
+  app.get(
+    "/api/audit-logs/inventory-report",
+    authenticate,
+    requireRoles("ADMIN", "AUDITOR"),
+    asyncHandler(async (_req, res) => {
+      const products = await prisma.product.findMany({
+        where: { isService: false },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          unitType: true,
+          buyingPrice: true,
+          currentStock: true,
+          minimumStockThreshold: true,
+          status: true,
+          lastRestockDate: true,
+        },
+        orderBy: [{ currentStock: "asc" }, { name: "asc" }],
+      });
+      const activeProducts = products.filter((product) => product.status === "ACTIVE");
+      const lowStockItems = activeProducts.filter((product) => product.currentStock <= product.minimumStockThreshold);
+      const recentTransactions = await prisma.inventoryTransaction.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+        include: {
+          product: { select: { id: true, name: true, sku: true, unitType: true } },
+        },
+      });
+
+      res.json({
+        summary: {
+          totalMaterials: products.length,
+          activeMaterials: activeProducts.length,
+          lowStockCount: lowStockItems.length,
+          outOfStockCount: activeProducts.filter((product) => product.currentStock <= 0).length,
+          inventoryValue: Number(activeProducts.reduce(
+            (total, product) => total + product.currentStock * product.buyingPrice,
+            0,
+          ).toFixed(2)),
+        },
+        lowStockItems: lowStockItems.slice(0, 20),
+        recentTransactions,
       });
     }),
   );
