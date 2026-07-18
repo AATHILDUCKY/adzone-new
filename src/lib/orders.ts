@@ -171,8 +171,16 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
     })
     .join("");
 
-  // Per-letter brand colors sampled from the adzone wordmark (a=red, d=orange, z=magenta, o=amber, n=pink, e=orange).
-  const brandLetterColors = ["#e63558", "#f06d2a", "#c94f9e", "#f6a523", "#ee5fa7", "#f17e2d"];
+  // Per-letter gradients matched to the adzone wordmark: red ad, violet/pink z,
+  // pink/yellow o, and yellow/orange ne.
+  const brandLetterGradients = [
+    "#df1d26, #df1d26",
+    "#df1d26, #df1d26",
+    "#b711f0, #dc5b99",
+    "#e57e92, #ffd000",
+    "#ffc900, #ffad00",
+    "#ffb000, #ff8800",
+  ];
   let brandLetterIndex = 0;
   const brandMarkup = shopProfile.shopName
     .split("")
@@ -180,9 +188,9 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
       if (!char.trim()) {
         return char;
       }
-      const color = brandLetterColors[brandLetterIndex % brandLetterColors.length];
+      const gradient = brandLetterGradients[brandLetterIndex % brandLetterGradients.length];
       brandLetterIndex += 1;
-      return `<span style="color:${color}">${escapeHtml(char)}</span>`;
+      return `<span style="background:linear-gradient(105deg,${gradient});-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent">${escapeHtml(char)}</span>`;
     })
     .join("");
 
@@ -405,7 +413,6 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
             <div class="pay-sign">
               <div>
                 <div class="pay-title">${escapeHtml(order.paymentMethod)} PAYMENT</div>
-                <div class="pay-note">Thank you for your business.</div>
               </div>
             </div>
 
