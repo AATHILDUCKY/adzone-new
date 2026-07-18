@@ -73,7 +73,8 @@ export default function Users() {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
-          role: formData.role
+          role: formData.role,
+          ...(formData.password ? { password: formData.password } : {})
         })
       });
       toast.success("User updated successfully");
@@ -338,16 +339,15 @@ export default function Users() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700">Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full rounded-xl border border-zinc-200 bg-white py-3 px-4 text-sm outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/5"
-                >
-                  <option value="CASHIER">Cashier</option>
-                  <option value="INVENTORY_MANAGER">Inventory Manager</option>
-                  <option value="ADMIN">Administrator</option>
-                </select>
+                <label className="text-sm font-medium text-zinc-700">Change Password <span className="font-normal text-zinc-400">(optional)</span></label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/5"
+                  placeholder="Leave blank to keep the current password"
+                  minLength={8}
+                />
               </div>
 
               <div className="mt-8 flex gap-3">

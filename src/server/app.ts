@@ -33,6 +33,27 @@ const publicUserSelect = {
   createdAt: true,
 };
 
+const INVOICE_SEQUENCE_META_KEY = "sales.invoice-sequence";
+
+async function getNextInvoiceNumber(tx: Prisma.TransactionClient) {
+  const rows = await tx.$queryRaw<{ value: string }[]>(Prisma.sql`
+    INSERT INTO "AppMeta" ("key", "value", "updatedAt")
+    VALUES (${INVOICE_SEQUENCE_META_KEY}, '1', NOW())
+    ON CONFLICT ("key") DO UPDATE
+    SET
+      "value" = (CAST("AppMeta"."value" AS BIGINT) + 1)::TEXT,
+      "updatedAt" = NOW()
+    RETURNING "value"
+  `);
+
+  const sequence = Number(rows[0]?.value);
+  if (!Number.isSafeInteger(sequence) || sequence < 1) {
+    throw new Error("Invoice sequence is invalid");
+  }
+
+  return `INV-${String(sequence).padStart(10, "0")}`;
+}
+
 const productInclude = {
   category: {
     select: { id: true, name: true },
@@ -419,6 +440,17 @@ function calculateSaleProfit(
   items: Array<{ quantity: number; buyingPrice: number; wastage?: number | null; designerCost?: number | null }>,
 ) {
   return Number((total - calculateSaleCost(items)).toFixed(2));
+}
+
+function calculateWastageTransactionCost(entry: {
+  quantity: number;
+  unitCost?: number | null;
+  buyingPrice?: number | null;
+}) {
+  // New transactions preserve the price paid at the time of wastage. The
+  // product price fallback keeps historical rows useful after this migration.
+  const unitCost = entry.unitCost ?? entry.buyingPrice ?? 0;
+  return entry.quantity * unitCost;
 }
 
 function normalizeSkuFragment(value: string) {
@@ -1355,7 +1387,6 @@ export async function createApp() {
 
       const [
         recentSalesWindow,
-        todayWastageAggregate,
         recentWastageTransactions,
         lowStockCandidates,
         activeProducts,
@@ -1386,25 +1417,23 @@ export async function createApp() {
             },
             orderBy: { createdAt: "asc" },
           }),
-          prisma.inventoryTransaction.aggregate({
-            where: { transactionType: "WASTAGE", createdAt: { gte: todayStart } },
-            _sum: { quantity: true },
-          }),
-          prisma.inventoryTransaction.findMany({
-            where: {
-              transactionType: "WASTAGE",
-              createdAt: { gte: previousWeekStart },
-            },
-            select: {
-              quantity: true,
-              createdAt: true,
-              product: {
-                select: {
-                  buyingPrice: true,
-                },
-              },
-            },
-          }),
+          prisma.$queryRaw<Array<{
+            quantity: number;
+            unitCost: number | null;
+            buyingPrice: number | null;
+            createdAt: Date;
+          }>>(Prisma.sql`
+            SELECT
+              wastage_transaction."quantity",
+              wastage_transaction."unitCost",
+              product."buyingPrice",
+              wastage_transaction."createdAt"
+            FROM "InventoryTransaction" AS wastage_transaction
+            LEFT JOIN "Product" AS product ON product."id" = wastage_transaction."productId"
+            WHERE
+              wastage_transaction."transactionType" = 'WASTAGE'
+              AND wastage_transaction."createdAt" >= ${previousWeekStart}
+          `),
           prisma.product.findMany({
             where: { status: "ACTIVE", isService: false },
             select: {
@@ -1442,30 +1471,30 @@ export async function createApp() {
       const todaySalesCount = todaySales.length;
       const todayRevenue = Number(todaySales.reduce((sum, sale) => sum + sale.total, 0).toFixed(2));
       const todayCost = calculateSaleCost(todaySales.flatMap((sale) => sale.items));
-      const todayWastageCost = Number(
-        recentWastageTransactions
-          .filter((entry) => entry.createdAt >= todayStart)
-          .reduce((sum, entry) => sum + entry.quantity * (entry.product?.buyingPrice ?? 0), 0)
-          .toFixed(2),
+      const wastageCosts = recentWastageTransactions.reduce(
+        (costs, entry) => {
+          const cost = calculateWastageTransactionCost(entry);
+
+          if (entry.createdAt >= todayStart) {
+            costs.today += cost;
+          }
+          if (entry.createdAt >= yesterdayStart && entry.createdAt < todayStart) {
+            costs.yesterday += cost;
+          }
+          if (entry.createdAt >= weekStart) {
+            costs.thisWeek += cost;
+          } else if (entry.createdAt < weekStart) {
+            costs.previousWeek += cost;
+          }
+
+          return costs;
+        },
+        { today: 0, yesterday: 0, thisWeek: 0, previousWeek: 0 },
       );
-      const weekWastageCost = Number(
-        recentWastageTransactions
-          .filter((entry) => entry.createdAt >= weekStart)
-          .reduce((sum, entry) => sum + entry.quantity * (entry.product?.buyingPrice ?? 0), 0)
-          .toFixed(2),
-      );
-      const previousWeekWastageCost = Number(
-        recentWastageTransactions
-          .filter((entry) => entry.createdAt >= previousWeekStart && entry.createdAt < weekStart)
-          .reduce((sum, entry) => sum + entry.quantity * (entry.product?.buyingPrice ?? 0), 0)
-          .toFixed(2),
-      );
-      const yesterdayWastageCost = Number(
-        recentWastageTransactions
-          .filter((entry) => entry.createdAt >= yesterdayStart && entry.createdAt < todayStart)
-          .reduce((sum, entry) => sum + entry.quantity * (entry.product?.buyingPrice ?? 0), 0)
-          .toFixed(2),
-      );
+      const todayWastageCost = Number(wastageCosts.today.toFixed(2));
+      const yesterdayWastageCost = Number(wastageCosts.yesterday.toFixed(2));
+      const weekWastageCost = Number(wastageCosts.thisWeek.toFixed(2));
+      const previousWeekWastageCost = Number(wastageCosts.previousWeek.toFixed(2));
       const todayProfit = Number((calculateSaleProfit(todayRevenue, todaySales.flatMap((sale) => sale.items)) - todayWastageCost).toFixed(2));
       const weekRevenue = Number(thisWeekSales.reduce((sum, sale) => sum + sale.total, 0).toFixed(2));
       const weekProfit = Number((thisWeekSales.reduce((sum, sale) => sum + calculateSaleProfit(sale.total, sale.items), 0) - weekWastageCost).toFixed(2));
@@ -1542,7 +1571,6 @@ export async function createApp() {
         todayCost,
         todayProfit,
         todayMargin: todayRevenue ? Number(((todayProfit / todayRevenue) * 100).toFixed(2)) : 0,
-        todayWastage: Number((todayWastageAggregate._sum.quantity ?? 0).toFixed(2)),
         todayWastageCost,
         lowStockCount,
         lowStockItems,
@@ -2529,9 +2557,9 @@ export async function createApp() {
       }
 
       const balance = Number((paidAmount - total).toFixed(2));
-      const invoiceNumber = `INV-${Date.now().toString().slice(-10)}`;
 
       const saleResult = await prisma.$transaction(async (tx) => {
+        const invoiceNumber = await getNextInvoiceNumber(tx);
         const createdSale = await tx.sale.create({
           data: {
             invoiceNumber,
@@ -2587,33 +2615,48 @@ export async function createApp() {
         }
 
         await tx.inventoryTransaction.createMany({
-          data: saleLines.filter((line) => line.deductsStock).flatMap((line) => {
-            const salesOut = {
+          data: saleLines
+            .filter((line) => line.deductsStock)
+            .map((line) => ({
               productId: line.targetProductId,
               transactionType: "SALE_OUT",
               quantity: line.stockReductionQuantity,
               referenceId: createdSale.id,
               performedBy: authUser.name,
               reason: line.product.isService ? `Material allocated to ${line.product.name}` : `Sale ${createdSale.invoiceNumber}`,
-            };
-
-            if (line.wastage <= 0) {
-              return [salesOut];
-            }
-
-            return [
-              salesOut,
-              {
-                productId: line.targetProductId,
-                transactionType: "WASTAGE",
-                quantity: line.wastageReductionQuantity,
-                referenceId: createdSale.id,
-                performedBy: authUser.name,
-                reason: `Wastage recorded for ${line.product.name} (${line.wastage.toFixed(2)} billed units)`,
-              },
-            ];
-          }),
+            })),
         });
+
+        for (const line of saleLines) {
+          if (!line.deductsStock || line.wastage <= 0) {
+            continue;
+          }
+
+          await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "InventoryTransaction" (
+              "id",
+              "productId",
+              "transactionType",
+              "quantity",
+              "unitCost",
+              "referenceId",
+              "performedBy",
+              "reason",
+              "createdAt"
+            )
+            VALUES (
+              ${randomUUID()},
+              ${line.targetProductId},
+              'WASTAGE',
+              ${line.wastageReductionQuantity},
+              ${line.buyingPrice},
+              ${createdSale.id},
+              ${authUser.name},
+              ${`Wastage recorded for ${line.product.name} (${line.wastage.toFixed(2)} billed units)`},
+              NOW()
+            )
+          `);
+        }
 
         const refreshedProducts = await tx.product.findMany({
           where: { id: { in: touchedProductIds } },
@@ -3878,7 +3921,21 @@ export async function createApp() {
         take: getLimit(req.query, 100, 500),
       });
 
-      res.json(usage);
+      const unitCostRows = usage.length
+        ? await prisma.$queryRaw<Array<{ id: string; unitCost: number | null }>>(Prisma.sql`
+            SELECT "id", "unitCost"
+            FROM "InventoryTransaction"
+            WHERE "id" IN (${Prisma.join(usage.map((entry) => entry.id))})
+          `)
+        : [];
+      const unitCostById = new Map(unitCostRows.map((entry) => [entry.id, entry.unitCost]));
+
+      res.json(
+        usage.map((entry) => ({
+          ...entry,
+          unitCost: unitCostById.get(entry.id) ?? null,
+        })),
+      );
     }),
   );
 

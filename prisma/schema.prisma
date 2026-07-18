@@ -186,6 +186,7 @@ model InventoryTransaction {
   product         Product  @relation(fields: [productId], references: [id])
   transactionType String   // STOCK_IN, SALE_OUT, ADJUSTMENT_IN, ADJUSTMENT_OUT, DAMAGED, RETURNED
   quantity        Float
+  unitCost        Float?
   referenceId     String?
   reason          String?
   performedBy     String?

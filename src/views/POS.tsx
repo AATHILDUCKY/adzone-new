@@ -14,6 +14,8 @@ import {
   ChevronRight,
   Minus,
   Plus,
+  TrendingUp,
+  TrendingDown,
   Ruler,
   Layers3,
   ShieldCheck,
@@ -1015,28 +1017,33 @@ export default function POS() {
       </div>
 
       <div className="flex w-full flex-col overflow-hidden rounded-3xl border border-zinc-100 bg-white shadow-xl xl:w-[420px]">
-        <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-5 sm:px-6">
-          <div className="flex items-center">
-            <ShoppingCart className="mr-2 text-orange-600" size={20} />
-            <h3 className="text-lg font-bold text-zinc-900">Current Order</h3>
+        <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-200/70">
+              <ShoppingCart size={19} />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold leading-tight text-zinc-900">Current Order</h3>
+              <p className="text-[11px] font-medium text-zinc-400">
+                {cart.length === 0 ? "No items yet" : `${cart.length} item${cart.length === 1 ? "" : "s"} in cart`}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openCustomerPanel(false)}
-              className={cn(
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-all",
-                selectedCustomer
-                  ? "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100"
-                  : "border-zinc-200 bg-white text-zinc-500 hover:border-orange-200 hover:text-orange-600",
-              )}
-              aria-label={selectedCustomer ? `Change customer: ${selectedCustomer.name}` : "Add customer details"}
-              title={selectedCustomer ? `Customer: ${selectedCustomer.name}` : "Add customer"}
-            >
-              {selectedCustomer ? <UserRound size={17} /> : <UserPlus size={17} />}
-            </button>
-            <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">{cart.length} Items</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => openCustomerPanel(false)}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-all",
+              selectedCustomer
+                ? "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                : "border-zinc-200 bg-white text-zinc-500 hover:border-orange-200 hover:text-orange-600",
+            )}
+            aria-label={selectedCustomer ? `Change customer: ${selectedCustomer.name}` : "Add customer details"}
+            title={selectedCustomer ? `Customer: ${selectedCustomer.name}` : "Add customer"}
+          >
+            {selectedCustomer ? <UserRound size={16} /> : <UserPlus size={16} />}
+            <span className="hidden sm:inline">{selectedCustomer ? "Customer" : "Add customer"}</span>
+          </button>
         </div>
 
         {selectedCustomer && (
@@ -1062,25 +1069,29 @@ export default function POS() {
               <p className="text-sm">Your cart is empty</p>
             </div>
           ) : (
-            cart.map((item, index) => (
-              <div key={`${item.productId}-${index}`} className="rounded-[26px] border border-zinc-200/80 bg-white p-4 shadow-sm">
+            cart.map((item, index) => {
+              const lineProfit = getLineProfit(item.total, item.buyingPrice, item.quantity, item.wastage, item.designerCost);
+              const lineMargin = getProfitMargin(item.total, lineProfit);
+              const profitPositive = lineProfit >= 0;
+              return (
+              <div key={`${item.productId}-${index}`} className="rounded-[26px] border border-zinc-200/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h5 className="line-clamp-1 text-sm font-bold text-zinc-900">{item.name}</h5>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      LKR {item.sellingPrice} / {getCartUnitLabel(item.unitType)}
+                    <h5 className="line-clamp-2 text-sm font-bold text-zinc-900">{item.name}</h5>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-zinc-500">
+                      <span className="font-semibold text-zinc-700">LKR {item.sellingPrice}</span>
+                      <span className="text-zinc-400">/ {getCartUnitLabel(item.unitType)}</span>
+                      <span className="text-zinc-300">•</span>
+                      <span>Cost LKR {item.buyingPrice}</span>
                     </p>
-                    <p className="mt-1 text-xs text-zinc-500">Cost: LKR {item.buyingPrice}</p>
-                    <p className={cn(
-                      "mt-1 text-xs font-semibold",
-                      getLineProfit(item.total, item.buyingPrice, item.quantity, item.wastage, item.designerCost) >= 0
-                        ? "text-emerald-600"
-                        : "text-red-600",
+                    <span className={cn(
+                      "mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold",
+                      profitPositive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600",
                     )}>
-                      Profit: LKR {getLineProfit(item.total, item.buyingPrice, item.quantity, item.wastage, item.designerCost).toLocaleString()}
-                      {" "}({getProfitMargin(item.total, getLineProfit(item.total, item.buyingPrice, item.quantity, item.wastage, item.designerCost)).toFixed(1)}%)
-                    </p>
-                    {item.configSummary && <p className="mt-1 text-xs text-zinc-500">{item.configSummary}</p>}
+                      {profitPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      Profit LKR {lineProfit.toLocaleString()} ({lineMargin.toFixed(1)}%)
+                    </span>
+                    {item.configSummary && <p className="mt-1.5 text-xs text-zinc-500">{item.configSummary}</p>}
                     <div className="mt-2 flex flex-wrap gap-2">
                       {item.designerCost > 0 && (
                         <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-700">
@@ -1204,7 +1215,8 @@ export default function POS() {
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

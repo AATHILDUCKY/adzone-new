@@ -69,6 +69,7 @@ type UsageRecord = {
   id: string;
   referenceId?: string | null;
   quantity: number;
+  unitCost?: number | null;
   transactionType: "SALE_OUT" | "WASTAGE";
   reason: string;
   createdAt: string;
@@ -79,6 +80,10 @@ type UsageRecord = {
     buyingPrice: number;
   } | null;
 };
+
+function getUsageCost(entry: Pick<UsageRecord, "quantity" | "unitCost" | "product">) {
+  return entry.quantity * (entry.unitCost ?? entry.product?.buyingPrice ?? 0);
+}
 
 function startOfDay(date: Date) {
   const nextDate = new Date(date);
@@ -517,7 +522,7 @@ export default function Reports() {
       return map;
     }
 
-    const nextValue = (map.get(entry.referenceId) ?? 0) + entry.quantity * (entry.product?.buyingPrice ?? 0);
+    const nextValue = (map.get(entry.referenceId) ?? 0) + getUsageCost(entry);
     map.set(entry.referenceId, nextValue);
     return map;
   }, new Map());
@@ -529,7 +534,7 @@ export default function Reports() {
   }, 0);
   const totalWastageCost = filteredUsage
     .filter((entry) => entry.transactionType === "WASTAGE")
-    .reduce((sum, entry) => sum + entry.quantity * (entry.product?.buyingPrice ?? 0), 0);
+    .reduce((sum, entry) => sum + getUsageCost(entry), 0);
   const totalServiceCost = filteredSales.reduce((sum, sale) => {
     return sum + sale.items.reduce((itemSum, item) => itemSum + (item.designerCost ?? 0), 0);
   }, 0);

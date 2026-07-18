@@ -259,8 +259,8 @@ export default function Dashboard() {
                     Track
                   </span>
                 </div>
-                <p className="metric-label mt-4">Today Wastage</p>
-                <p className="hero-stat-value">{stats.todayWastage?.toFixed?.(2) ?? "0.00"}</p>
+                <p className="metric-label mt-4">Today Wastage Cost</p>
+                <p className="hero-stat-value">{formatCurrency(stats.todayWastageCost)}</p>
               </div>
               <div className="hero-stat">
                 <div className="flex items-start justify-between gap-2">
