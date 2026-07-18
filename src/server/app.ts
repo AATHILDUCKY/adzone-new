@@ -545,7 +545,13 @@ async function printB5Invoice(printerName: string, markup: string) {
       `--print-to-pdf=${pdfPath}`,
       `file://${htmlPath}`,
     ], { timeout: 30_000 });
-    await execFileAsync("lp", ["-d", printerName, "-o", "media=iso_b5_176x250mm", pdfPath], { timeout: 15_000 });
+    await execFileAsync("lp", [
+      "-d", printerName,
+      "-o", "media=iso_b5_176x250mm",
+      "-o", "orientation-requested=3",
+      "-o", "fit-to-page",
+      pdfPath,
+    ], { timeout: 15_000 });
   } catch {
     throw new ApiError(503, "The invoice could not be sent to the printer");
   } finally {
@@ -577,12 +583,15 @@ function metersToFeet(value: number) {
 // METER was the old internal name for the length unit. Length stock has always
 // been entered and calculated as feet, so normalize legacy clients/data here.
 function normalizeUnitType(value: string) {
-  return value === "METER" ? "FEET" : value;
+  const normalizedValue = value.trim().toUpperCase();
+  return ["METER", "METERS", "METRE", "METRES", "FOOT", "FEET", "FEETS"].includes(normalizedValue)
+    ? "FEET"
+    : normalizedValue;
 }
 
 async function ensureLengthUnitsStoredAsFeet() {
   await prisma.product.updateMany({
-    where: { unitType: "METER" },
+    where: { unitType: { in: ["METER", "METERS", "METRE", "METRES", "FOOT", "FEETS"] } },
     data: { unitType: "FEET" },
   });
 }

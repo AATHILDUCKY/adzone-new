@@ -90,7 +90,9 @@ function isPerUnitType(unitType: string) {
 }
 
 function getUnitLabel(unitType: string) {
-  return unitType === "FEET" || unitType === "METER" ? "feet" : unitType.toLowerCase();
+  return ["METER", "METERS", "METRE", "METRES", "FOOT", "FEET", "FEETS"].includes(unitType.trim().toUpperCase())
+    ? "feet"
+    : unitType.toLowerCase();
 }
 
 function getUnitPriceLabel(unitType: string) {

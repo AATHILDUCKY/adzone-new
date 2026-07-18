@@ -214,7 +214,10 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
         <style>
           :root { color-scheme: light; }
           * { box-sizing: border-box; }
-          @page { size: B5 portrait; margin: 0; }
+          /* ISO B5 is 176 × 250 mm. Explicit dimensions work in browsers and
+             print drivers that do not recognize the B5 page-size keyword. */
+          @page { size: 176mm 250mm; margin: 0; }
+          html { width: 176mm; min-height: 250mm; }
           body {
             margin: 0;
             padding: 0 12px 16px;
@@ -339,8 +342,9 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
             overflow-wrap: anywhere;
           }
           @media print {
+            html, body { width: 176mm; min-height: 250mm; }
             body { background: #fff; padding: 0; }
-            .sheet { width: 176mm; min-height: 250mm; margin: 0; box-shadow: none; }
+            .sheet { width: 176mm; min-height: 250mm; margin: 0; box-shadow: none; break-after: page; }
             .band-top, .pad { padding-left: 14mm; padding-right: 14mm; }
             .band-bottom { padding-left: 12mm; padding-right: 12mm; }
           }
@@ -434,6 +438,22 @@ export async function printOrderInvoice(order: OrderInvoice, shopProfile: ShopPr
   printWindow.document.open();
   printWindow.document.write(buildInvoiceMarkup(order, shopProfile));
   printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
+
+  // Wait for the invoice document, including its logo, to finish laying out
+  // before opening the print dialog. This lets the B5 @page rule be applied.
+  await new Promise<void>((resolve) => {
+    const printInvoice = () => {
+      printWindow.requestAnimationFrame(() => {
+        printWindow.focus();
+        printWindow.print();
+        resolve();
+      });
+    };
+
+    if (printWindow.document.readyState === "complete") {
+      printInvoice();
+    } else {
+      printWindow.addEventListener("load", printInvoice, { once: true });
+    }
+  });
 }

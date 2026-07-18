@@ -78,6 +78,7 @@ type CartItem = {
   designerCost: number;
   discount: number;
   wastage: number;
+  wastageNote?: string;
   total: number;
   configSummary?: string;
   materialReduction?: number;
@@ -97,6 +98,7 @@ type ConfigState = {
   designerCost: number;
   lineDiscount: number;
   wastage: number;
+  wastageNote: string;
   sizePreset: string;
 };
 
@@ -127,6 +129,7 @@ function createInitialConfig(product?: Product | null): ConfigState {
     designerCost: 0,
     lineDiscount: 0,
     wastage: 0,
+    wastageNote: "",
     sizePreset: "CUSTOM",
   };
 }
@@ -142,8 +145,20 @@ function createInitialProductForm(product?: Product | null): ProductCreateState 
   };
 }
 
+function isFeetUnit(unitType: string) {
+  return ["METER", "METERS", "METRE", "METRES", "FOOT", "FEET", "FEETS"].includes(unitType.trim().toUpperCase());
+}
+
+function getCartUnitLabel(unitType: string) {
+  return isFeetUnit(unitType) ? "feet" : unitType.toLowerCase();
+}
+
+function getWastageUnitLabel(unitType: string) {
+  return isFeetUnit(unitType) ? "feet" : unitType;
+}
+
 function isConfigurableProduct(product: Product) {
-  return product.isService || ["SQFT", "FEET", "ROLL"].includes(product.unitType);
+  return product.isService || ["SQFT", "ROLL"].includes(product.unitType) || isFeetUnit(product.unitType);
 }
 
 // Categories were removed; any ROLL material is treated as feet-based (banner-style).
@@ -168,7 +183,7 @@ function getLengthUnitLabel(product: Product) {
     return "feet";
   }
 
-  return product.unitType === "FEET" ? "feet" : product.unitType.toLowerCase();
+  return isFeetUnit(product.unitType) ? "feet" : product.unitType.toLowerCase();
 }
 
 function getLengthUnitPriceLabel(product: Product) {
@@ -176,7 +191,7 @@ function getLengthUnitPriceLabel(product: Product) {
     return "foot";
   }
 
-  return product.unitType === "FEET" ? "foot" : product.unitType.toLowerCase();
+  return isFeetUnit(product.unitType) ? "foot" : product.unitType.toLowerCase();
 }
 
 function getAvailableLengthFromRolls(product: Product) {
@@ -228,7 +243,7 @@ function getBilledQuantity(product: Product, config: ConfigState) {
     return config.width * config.height;
   }
 
-  if (product.unitType === "FEET" || isBannerRollProduct(product)) {
+  if (isFeetUnit(product.unitType) || isBannerRollProduct(product)) {
     return config.length;
   }
 
@@ -526,6 +541,14 @@ export default function POS() {
     );
   };
 
+  const updateCartWastageNote = (index: number, wastageNote: string) => {
+    setCart((currentCart) =>
+      currentCart.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, wastageNote } : item,
+      ),
+    );
+  };
+
   const toggleServiceChargeInput = (index: number) => {
     setCart((currentCart) =>
       currentCart.map((item, itemIndex) =>
@@ -609,7 +632,7 @@ export default function POS() {
     const configSummary =
       activeConfigItem.unitType === "SQFT"
         ? `${configData.width}ft x ${configData.height}ft (${formatQuantity(billedQuantity)} sqft)`
-        : activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
+        : isFeetUnit(activeConfigItem.unitType) || isBannerRollProduct(activeConfigItem)
           ? `${formatQuantity(configData.length)} ${getLengthUnitLabel(activeConfigItem)}`
           : `${formatQuantity(configData.quantity)} ${activeConfigItem.unitType.toLowerCase()}`;
 
@@ -625,6 +648,7 @@ export default function POS() {
         designerCost: configData.designerCost,
         discount: configData.lineDiscount,
         wastage: configData.wastage,
+        wastageNote: configData.wastageNote.trim() || undefined,
         total: lineTotal,
         configSummary,
         materialReduction:
@@ -1044,7 +1068,7 @@ export default function POS() {
                   <div className="min-w-0 flex-1">
                     <h5 className="line-clamp-1 text-sm font-bold text-zinc-900">{item.name}</h5>
                     <p className="mt-1 text-xs text-zinc-500">
-                      LKR {item.sellingPrice} / {item.unitType.toLowerCase()}
+                      LKR {item.sellingPrice} / {getCartUnitLabel(item.unitType)}
                     </p>
                     <p className="mt-1 text-xs text-zinc-500">Cost: LKR {item.buyingPrice}</p>
                     <p className={cn(
@@ -1065,8 +1089,13 @@ export default function POS() {
                       )}
                       {item.wastage > 0 && (
                         <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-600">
-                          Wastage: {formatQuantity(item.wastage)} {item.unitType}
+                          Wastage: {formatQuantity(item.wastage)} {getCartUnitLabel(item.unitType)}
                         </span>
+                      )}
+                      {item.wastageNote && (
+                        <p className="w-full text-xs leading-relaxed text-zinc-500">
+                          Note: {item.wastageNote}
+                        </p>
                       )}
                     </div>
                     {item.materialReduction && item.materialName && (
@@ -1124,10 +1153,10 @@ export default function POS() {
                     className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold leading-tight text-red-700 transition-all hover:border-red-300 hover:bg-red-100"
                   >
                     {shouldShowWastageInput(item)
-                      ? `Hide Wastage (${item.unitType})`
+                      ? `Hide Wastage (${getWastageUnitLabel(item.unitType)})`
                       : item.wastage > 0
-                        ? `Edit Wastage (${item.unitType})`
-                        : `Add Wastage (${item.unitType})`}
+                        ? `Edit Wastage (${getWastageUnitLabel(item.unitType)})`
+                        : `Add Wastage (${getWastageUnitLabel(item.unitType)})`}
                   </button>
                 </div>
                 {shouldShowServiceChargeInput(item) && (
@@ -1147,7 +1176,7 @@ export default function POS() {
                 {shouldShowWastageInput(item) && (
                   <div className="mt-2">
                     <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                      Wastage ({item.unitType})
+                      Wastage ({getWastageUnitLabel(item.unitType)})
                     </label>
                     <input
                       type="number"
@@ -1156,6 +1185,21 @@ export default function POS() {
                       value={item.wastage}
                       onChange={(event) => updateCartWastage(index, Number(event.target.value))}
                       className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-orange-500 focus:outline-none"
+                    />
+                    {isFeetUnit(item.unitType) && (
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                        Wastage is recorded in feet and added to material cost; it is not charged to the customer.
+                      </p>
+                    )}
+                    <label className="mb-1 mt-3 block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                      Wastage Note
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={item.wastageNote ?? ""}
+                      onChange={(event) => updateCartWastageNote(index, event.target.value)}
+                      placeholder="Add a note about this wastage"
+                      className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none"
                     />
                   </div>
                 )}
@@ -1338,7 +1382,7 @@ export default function POS() {
                   </>
                 )}
 
-                {(activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)) && (
+                {(isFeetUnit(activeConfigItem.unitType) || isBannerRollProduct(activeConfigItem)) && (
                   <div>
                     <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">
                       Length ({isLengthInFeet(activeConfigItem) ? "ft" : "feet"})
@@ -1357,7 +1401,7 @@ export default function POS() {
                   </div>
                 )}
 
-                {activeConfigItem.unitType !== "SQFT" && activeConfigItem.unitType !== "FEET" && !isBannerRollProduct(activeConfigItem) && (
+                {activeConfigItem.unitType !== "SQFT" && !isFeetUnit(activeConfigItem.unitType) && !isBannerRollProduct(activeConfigItem) && (
                   <div>
                     <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">Quantity</label>
                     <input
@@ -1407,7 +1451,7 @@ export default function POS() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    Wastage ({activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
+                    Wastage ({isFeetUnit(activeConfigItem.unitType) || isBannerRollProduct(activeConfigItem)
                       ? (isLengthInFeet(activeConfigItem) ? "ft" : "feet")
                       : activeConfigItem.unitType})
                   </label>
@@ -1424,6 +1468,28 @@ export default function POS() {
                     }
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-orange-500 focus:bg-white focus:outline-none"
                   />
+                  {(isFeetUnit(activeConfigItem.unitType) || isBannerRollProduct(activeConfigItem)) && (
+                    <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+                      Record wastage in feet. It is included in material cost, but not added to the customer’s billed length.
+                    </p>
+                  )}
+                  {configData.wastage > 0 && (
+                    <div className="mt-3">
+                      <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">Wastage Note</label>
+                      <textarea
+                        rows={2}
+                        value={configData.wastageNote}
+                        onChange={(event) =>
+                          setConfigData((currentState) => ({
+                            ...currentState,
+                            wastageNote: event.target.value,
+                          }))
+                        }
+                        placeholder="Add a note about this wastage"
+                        className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm placeholder:text-zinc-400 focus:border-orange-500 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1437,7 +1503,7 @@ export default function POS() {
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-500">Billed quantity</span>
                     <span className="font-bold">
-                      {formatQuantity(previewQuantity)} {activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
+                      {formatQuantity(previewQuantity)} {isFeetUnit(activeConfigItem.unitType) || isBannerRollProduct(activeConfigItem)
                         ? getLengthUnitCode(activeConfigItem)
                         : activeConfigItem.unitType}
                     </span>
@@ -1457,11 +1523,21 @@ export default function POS() {
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-500">Wastage</span>
                     <span className="font-bold">
-                      {formatQuantity(configData.wastage)} {activeConfigItem.unitType === "FEET" || isBannerRollProduct(activeConfigItem)
+                      {formatQuantity(configData.wastage)} {isFeetUnit(activeConfigItem.unitType) || isBannerRollProduct(activeConfigItem)
                         ? getLengthUnitCode(activeConfigItem)
                         : activeConfigItem.unitType}
                     </span>
                   </div>
+                  {configData.wastage > 0 && (isFeetUnit(activeConfigItem.unitType) || isBannerRollProduct(activeConfigItem)) && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
+                      <span className="font-bold">Wastage note:</span> {formatQuantity(configData.wastage)} ft is included in the material cost (LKR {previewWastageCost.toLocaleString()}) and is not charged to the customer.
+                    </div>
+                  )}
+                  {configData.wastageNote.trim() && (
+                    <div className="rounded-2xl bg-white/70 px-3 py-2.5 text-xs leading-relaxed text-zinc-600">
+                      <span className="font-bold text-zinc-700">Wastage note:</span> {configData.wastageNote}
+                    </div>
+                  )}
                   {activeConfigItem.material && (
                     <div className="rounded-2xl bg-white/70 p-3">
                       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-500">

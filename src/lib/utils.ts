@@ -25,8 +25,19 @@ function normalizeEndpoint(endpoint: string) {
 }
 
 // Older versions stored the feet-based length unit under the misleading METER
-// code. Normalize all API responses at one boundary so every screen, label and
-// calculation consistently receives FEET, including data from an older server.
+// code. Some clients also sent plural values such as FEETS. Normalize all API
+// responses at one boundary so every screen, label and calculation consistently
+// receives FEET, including data from an older server.
+function normalizeUnitType(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return ["METER", "METERS", "METRE", "METRES", "FOOT", "FEET", "FEETS"].includes(value.trim().toUpperCase())
+    ? "FEET"
+    : value;
+}
+
 function normalizeLegacyUnits(value: any): any {
   if (Array.isArray(value)) {
     return value.map(normalizeLegacyUnits);
@@ -36,7 +47,7 @@ function normalizeLegacyUnits(value: any): any {
     return Object.fromEntries(
       Object.entries(value).map(([key, nestedValue]) => [
         key,
-        key === "unitType" && nestedValue === "METER" ? "FEET" : normalizeLegacyUnits(nestedValue),
+        key === "unitType" ? normalizeUnitType(nestedValue) : normalizeLegacyUnits(nestedValue),
       ]),
     );
   }
