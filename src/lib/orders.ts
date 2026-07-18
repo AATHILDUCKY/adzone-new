@@ -171,15 +171,16 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
     })
     .join("");
 
-  // Per-letter gradients matched to the adzone wordmark: red ad, violet/pink z,
-  // pink/yellow o, and yellow/orange ne.
-  const brandLetterGradients = [
-    "#df1d26, #df1d26",
-    "#df1d26, #df1d26",
-    "#b711f0, #dc5b99",
-    "#e57e92, #ffd000",
-    "#ffc900, #ffad00",
-    "#ffb000, #ff8800",
+  // Printer and PDF engines do not consistently support text-clipped CSS
+  // gradients. Use the sampled brand colors directly so every invoice prints
+  // the wordmark cleanly, without colored rectangular blocks.
+  const brandLetterColors = [
+    "#df1d26",
+    "#df1d26",
+    "#c327cf",
+    "#f2a64e",
+    "#ffc400",
+    "#ff9400",
   ];
   let brandLetterIndex = 0;
   const brandMarkup = shopProfile.shopName
@@ -188,9 +189,9 @@ export function buildInvoiceMarkup(order: OrderInvoice, shopProfile: ShopProfile
       if (!char.trim()) {
         return char;
       }
-      const gradient = brandLetterGradients[brandLetterIndex % brandLetterGradients.length];
+      const color = brandLetterColors[brandLetterIndex % brandLetterColors.length];
       brandLetterIndex += 1;
-      return `<span style="background:linear-gradient(105deg,${gradient});-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent">${escapeHtml(char)}</span>`;
+      return `<span style="color:${color}">${escapeHtml(char)}</span>`;
     })
     .join("");
 
